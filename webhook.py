@@ -1,10 +1,22 @@
 from flask import Flask, request, jsonify
 import requests
 import config
+import json
+import os
 
 app = Flask(__name__)
 
-ml_access_token = None
+TOKEN_FILE = "tokens.json"
+
+def guardar_token(data):
+    with open(TOKEN_FILE, "w") as f:
+        json.dump(data, f)
+
+def cargar_token():
+    if os.path.exists(TOKEN_FILE):
+        with open(TOKEN_FILE, "r") as f:
+            return json.load(f)
+    return None
 
 @app.route("/")
 def home():
@@ -20,7 +32,6 @@ def webhook():
 
 @app.route("/callback")
 def callback():
-    global ml_access_token
     code = request.args.get("code")
     if not code:
         return "Error: no se recibió código", 400
@@ -32,9 +43,16 @@ def callback():
         "redirect_uri": config.ML_REDIRECT_URI
     })
     tokens = response.json()
-    ml_access_token = tokens.get("access_token")
-    print("Token obtenido:", ml_access_token)
+    guardar_token(tokens)
+    print("Token guardado:", tokens.get("access_token"))
     return "✅ Autorización exitosa. Puedes cerrar esta ventana."
+
+@app.route("/token")
+def ver_token():
+    tokens = cargar_token()
+    if tokens:
+        return jsonify({"access_token": tokens.get("access_token")})
+    return jsonify({"error": "No hay token guardado"}), 404
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
